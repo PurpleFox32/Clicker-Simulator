@@ -11,6 +11,7 @@
     function updateTierUI(i) {
         const t = Game.state.pointTiers[i];
         const refs = ui.ptier[i];
+        if (!refs) return;
 
         t.unlocked = isUnlocked(t);
         refs.root.classList.toggle('unlocked', t.unlocked);
@@ -36,12 +37,41 @@
     }
 
     const AutoPoint = {
+        ready: false,
+
         init() {
             ui.ptier = [
-                { root: document.getElementById('ptier0'), stats: p0Stats, fill: p0Fill, timeLabel: p0TimeLabel, btnPower: p0Power, lockMsg: p0LockMsg },
-                { root: document.getElementById('ptier1'), stats: p1Stats, fill: p1Fill, timeLabel: p1TimeLabel, btnPower: p1Power, lockMsg: p1LockMsg },
-                { root: document.getElementById('ptier2'), stats: p2Stats, fill: p2Fill, timeLabel: p2TimeLabel, btnPower: p2Power, lockMsg: p2LockMsg },
+                {
+                    root: document.getElementById('ptier0'),
+                    stats: document.getElementById('p0Stats'),
+                    fill: document.getElementById('p0Fill'),
+                    timeLabel: document.getElementById('p0TimeLabel'),
+                    btnPower: document.getElementById('p0Power'),
+                    lockMsg: document.getElementById('p0LockMsg'),
+                },
+                {
+                    root: document.getElementById('ptier1'),
+                    stats: document.getElementById('p1Stats'),
+                    fill: document.getElementById('p1Fill'),
+                    timeLabel: document.getElementById('p1TimeLabel'),
+                    btnPower: document.getElementById('p1Power'),
+                    lockMsg: document.getElementById('p1LockMsg'),
+                },
+                {
+                    root: document.getElementById('ptier2'),
+                    stats: document.getElementById('p2Stats'),
+                    fill: document.getElementById('p2Fill'),
+                    timeLabel: document.getElementById('p2TimeLabel'),
+                    btnPower: document.getElementById('p2Power'),
+                    lockMsg: document.getElementById('p2LockMsg'),
+                },
             ];
+
+            // Guard against missing DOM (shouldn’t happen with provided HTML)
+            if (ui.ptier.some(refs => !refs.root)) {
+                console.warn('AutoPoint: missing tier DOM elements. Will retry on next tick.');
+                return;
+            }
 
             // Wire power buttons
             ui.ptier.forEach((refs, i) => {
@@ -59,15 +89,19 @@
                 });
             });
 
+            this.ready = true;
             this.updateUIAll();
         },
 
         updateUIAll() { for (let i = 0; i < Game.state.pointTiers.length; i++) updateTierUI(i); },
 
         tick(dt) {
+            if (!this.ready) return;
+
             for (let i = 0; i < Game.state.pointTiers.length; i++) {
                 const t = Game.state.pointTiers[i];
                 const refs = ui.ptier[i];
+                if (!refs) continue;
 
                 const wasUnlocked = t.unlocked;
                 t.unlocked = isUnlocked(t);

@@ -110,7 +110,6 @@
     Game.incrementPerClick = () =>
         Math.max(1, Math.ceil(Game.state.rebirthMultiplier * Game.state.clickPower * Game.state.clickUpgradeLevel));
 
-    // Smoothly scales later-game payout so it doesn't get grindy
     Game.dynamicPointsMultiplier = () =>
         Math.max(1, Math.pow(Game.state.progressMax / Game.BASE.progressMax, 0.5));
 
@@ -146,6 +145,7 @@
         Game.updateDisplays();
     };
 
+    // ===== UI refresh & buttons =====
     Game.updateButtons = () => {
         const { points } = Game.state;
         const canPoints = points >= Math.ceil(Game.state.pointUpgradeCost);
@@ -160,9 +160,9 @@
         Game.el.upgradeClicks.textContent = `Upgrade Click Power L${Game.state.clickUpgradeLevel} (Cost: ${Game.fmt(Game.state.clickUpgradeCost)})`;
         Game.el.rebirth.textContent = `Rebirth (Cost: ${Game.fmt(Game.state.rebirthCost)})`;
 
-        // Let modules refresh their button/labels too
-        if (Game.AutoClick && Game.AutoClick.updateUIAll) Game.AutoClick.updateUIAll();
-        if (Game.AutoPoint && Game.AutoPoint.updateUIAll) Game.AutoPoint.updateUIAll();
+        // Only ask modules to refresh if they are initialized
+        if (Game.AutoClick && Game.AutoClick.ready && Game.AutoClick.updateUIAll) Game.AutoClick.updateUIAll();
+        if (Game.AutoPoint && Game.AutoPoint.ready && Game.AutoPoint.updateUIAll) Game.AutoPoint.updateUIAll();
     };
 
     Game.updateDisplays = () => {
@@ -203,6 +203,26 @@
             }
             Game.state = { ...Game.state, ...saved };
         } catch { }
+    };
+
+    // ===== Safer module initialization =====
+    Game.ensureModulesInitialized = () => {
+        try {
+            if (Game.AutoClick && !Game.AutoClick.ready && typeof Game.AutoClick.init === 'function') {
+                Game.AutoClick.init();
+                Game.AutoClick.ready = true;
+            }
+        } catch (e) {
+            console.error('AutoClick init error:', e);
+        }
+        try {
+            if (Game.AutoPoint && !Game.AutoPoint.ready && typeof Game.AutoPoint.init === 'function') {
+                Game.AutoPoint.init();
+                Game.AutoPoint.ready = true;
+            }
+        } catch (e) {
+            console.error('AutoPoint init error:', e);
+        }
     };
 
     // ===== Bind core events =====
@@ -279,8 +299,12 @@
     Game._loopRunning = false;
 
     Game.tick = (dt) => {
-        if (Game.AutoClick && Game.AutoClick.tick) Game.AutoClick.tick(dt);
-        if (Game.AutoPoint && Game.AutoPoint.tick) Game.AutoPoint.tick(dt);
+        // Make sure modules are initialized even if they loaded late
+        Game.ensureModulesInitialized();
+
+        if (Game.AutoClick && Game.AutoClick.ready && Game.AutoClick.tick) Game.AutoClick.tick(dt);
+        if (Game.AutoPoint && Game.AutoPoint.ready && Game.AutoPoint.tick) Game.AutoPoint.tick(dt);
+
         Game.updateButtons();
     };
 
@@ -298,21 +322,13 @@
     };
 
     // ===== Bootstrap =====
-    function waitForModulesThenInit() {
-        if (Game.AutoClick && Game.AutoPoint) {
-            Game.AutoClick.init();
-            Game.AutoPoint.init();
-            Game.updateDisplays();
-            Game.startLoop();
-        } else {
-            setTimeout(waitForModulesThenInit, 0);
-        }
-    }
-
     document.addEventListener('DOMContentLoaded', () => {
         Game.loadGame();
         Game.bindMainHandlers();
         Game.updateDisplays();
-        waitForModulesThenInit();
+
+        // Start loop immediately (don’t block on both modules)
+        Game.ensureModulesInitialized();
+        Game.startLoop();
     });
 })();

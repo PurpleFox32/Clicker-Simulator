@@ -15,37 +15,46 @@
     function updateTierUI(i) {
         const t = Game.state.clickTiers[i];
         const refs = ui.ctier[i];
+        if (!refs) return;
 
         refs.root.classList.toggle('unlocked', !!t.unlocked);
-        refs.btnUnlock.textContent = `Unlock Tier ${i + 1} (${Game.fmt(t.unlockCost)})`;
-        refs.btnUnlock.disabled = !!t.unlocked || Game.state.points < t.unlockCost;
+        if (refs.btnUnlock) {
+            refs.btnUnlock.textContent = `Unlock Tier ${i + 1} (${Game.fmt(t.unlockCost)})`;
+            refs.btnUnlock.disabled = !!t.unlocked || Game.state.points < t.unlockCost;
+        }
 
         if (!t.unlocked) {
-            refs.fill.style.width = '0%';
-            refs.timeLabel.textContent = `${(clickIntervalMs(t) / 1000).toFixed(2)}s`;
+            if (refs.fill) refs.fill.style.width = '0%';
+            if (refs.timeLabel) refs.timeLabel.textContent = `${(clickIntervalMs(t) / 1000).toFixed(2)}s`;
             return;
         }
 
         const secs = clickIntervalMs(t) / 1000;
-        refs.stats.textContent = `+${clickTierPower(t)} / ${secs.toFixed(secs % 1 === 0 ? 0 : 2)}s`;
+        if (refs.stats) refs.stats.textContent = `+${clickTierPower(t)} / ${secs.toFixed(secs % 1 === 0 ? 0 : 2)}s`;
 
         const remain = Math.max(0, (clickIntervalMs(t) - t.elapsedMs) / 1000);
-        refs.timeLabel.textContent = `${remain.toFixed(remain % 1 === 0 ? 0 : 2)}s`;
+        if (refs.timeLabel) refs.timeLabel.textContent = `${remain.toFixed(remain % 1 === 0 ? 0 : 2)}s`;
 
         const timeMaxed = t.timeLevel >= Game.BASE.timeMaxLevel || clickIntervalMs(t) <= Game.BASE.timeMinMs;
-        refs.btnTime.textContent = timeMaxed
-            ? `Time L${t.timeLevel} (MAX)`
-            : `Time L${t.timeLevel} (${Game.fmt(Math.ceil(t.timeCost))})`;
-        refs.btnTime.disabled = timeMaxed || Game.state.points < Math.ceil(t.timeCost);
+        if (refs.btnTime) {
+            refs.btnTime.textContent = timeMaxed
+                ? `Time L${t.timeLevel} (MAX)`
+                : `Time L${t.timeLevel} (${Game.fmt(Math.ceil(t.timeCost))})`;
+            refs.btnTime.disabled = timeMaxed || Game.state.points < Math.ceil(t.timeCost);
+        }
 
         const powerMaxed = t.powerLevel >= Game.BASE.powerMaxExtraClicks;
-        refs.btnPower.textContent = powerMaxed
-            ? `Power L${t.powerLevel} (MAX)`
-            : `Power L${t.powerLevel} (${Game.fmt(Math.ceil(t.powerCost))})`;
-        refs.btnPower.disabled = powerMaxed || Game.state.points < Math.ceil(t.powerCost);
+        if (refs.btnPower) {
+            refs.btnPower.textContent = powerMaxed
+                ? `Power L${t.powerLevel} (MAX)`
+                : `Power L${t.powerLevel} (${Game.fmt(Math.ceil(t.powerCost))})`;
+            refs.btnPower.disabled = powerMaxed || Game.state.points < Math.ceil(t.powerCost);
+        }
     }
 
     const AutoClick = {
+        ready: false,
+
         init() {
             ui.ctier = [
                 {
@@ -77,60 +86,76 @@
                 },
             ];
 
+            // Guard against missing DOM (shouldn’t happen with provided HTML)
+            if (ui.ctier.some(refs => !refs.root)) {
+                console.warn('AutoClick: missing tier DOM elements. Will retry on next tick.');
+                return;
+            }
+
             // Wire buttons
             ui.ctier.forEach((refs, i) => {
                 const t = Game.state.clickTiers[i];
 
-                refs.btnUnlock.addEventListener('click', () => {
-                    if (t.unlocked) return;
-                    if (Game.state.points >= t.unlockCost) {
-                        Game.state.points -= t.unlockCost;
-                        t.unlocked = true;
-                        t.elapsedMs = 0;
-                        refs.root.classList.add('unlocked'); // immediate visual flip
-                        Game.updateDisplays();
-                    }
-                });
+                if (refs.btnUnlock) {
+                    refs.btnUnlock.addEventListener('click', () => {
+                        if (t.unlocked) return;
+                        if (Game.state.points >= t.unlockCost) {
+                            Game.state.points -= t.unlockCost;
+                            t.unlocked = true;
+                            t.elapsedMs = 0;
+                            refs.root.classList.add('unlocked'); // immediate visual flip
+                            Game.updateDisplays();
+                        }
+                    });
+                }
 
-                refs.btnTime.addEventListener('click', () => {
-                    if (!t.unlocked) return;
-                    const maxed = t.timeLevel >= Game.BASE.timeMaxLevel;
-                    const cost = Math.ceil(t.timeCost);
-                    if (!maxed && Game.state.points >= cost) {
-                        Game.state.points -= cost;
-                        t.timeLevel++;
-                        t.timeCost = Math.ceil(t.timeCost * Game.BASE.tierUpgradeCostMult);
-                        if (clickIntervalMs(t) <= Game.BASE.timeMinMs) t.timeLevel = Game.BASE.timeMaxLevel;
-                        Game.updateDisplays();
-                    }
-                });
+                if (refs.btnTime) {
+                    refs.btnTime.addEventListener('click', () => {
+                        if (!t.unlocked) return;
+                        const maxed = t.timeLevel >= Game.BASE.timeMaxLevel;
+                        const cost = Math.ceil(t.timeCost);
+                        if (!maxed && Game.state.points >= cost) {
+                            Game.state.points -= cost;
+                            t.timeLevel++;
+                            t.timeCost = Math.ceil(t.timeCost * Game.BASE.tierUpgradeCostMult);
+                            if (clickIntervalMs(t) <= Game.BASE.timeMinMs) t.timeLevel = Game.BASE.timeMaxLevel;
+                            Game.updateDisplays();
+                        }
+                    });
+                }
 
-                refs.btnPower.addEventListener('click', () => {
-                    if (!t.unlocked) return;
-                    const maxed = t.powerLevel >= Game.BASE.powerMaxExtraClicks;
-                    const cost = Math.ceil(t.powerCost);
-                    if (!maxed && Game.state.points >= cost) {
-                        Game.state.points -= cost;
-                        t.powerLevel++;
-                        t.powerCost = Math.ceil(t.powerCost * Game.BASE.tierUpgradeCostMult);
-                        Game.updateDisplays();
-                    }
-                });
+                if (refs.btnPower) {
+                    refs.btnPower.addEventListener('click', () => {
+                        if (!t.unlocked) return;
+                        const maxed = t.powerLevel >= Game.BASE.powerMaxExtraClicks;
+                        const cost = Math.ceil(t.powerCost);
+                        if (!maxed && Game.state.points >= cost) {
+                            Game.state.points -= cost;
+                            t.powerLevel++;
+                            t.powerCost = Math.ceil(t.powerCost * Game.BASE.tierUpgradeCostMult);
+                            Game.updateDisplays();
+                        }
+                    });
+                }
             });
 
+            this.ready = true;
             this.updateUIAll();
         },
 
         updateUIAll() { for (let i = 0; i < Game.state.clickTiers.length; i++) updateTierUI(i); },
 
         tick(dt) {
+            if (!this.ready) return;
+
             for (let i = 0; i < Game.state.clickTiers.length; i++) {
                 const t = Game.state.clickTiers[i];
                 const refs = ui.ctier[i];
+                if (!refs) continue;
 
                 if (!t.unlocked) {
-                    refs.fill.style.width = '0%';
-                    refs.timeLabel.textContent = `${(clickIntervalMs(t) / 1000).toFixed(2)}s`;
+                    if (refs.fill) refs.fill.style.width = '0%';
+                    if (refs.timeLabel) refs.timeLabel.textContent = `${(clickIntervalMs(t) / 1000).toFixed(2)}s`;
                     continue;
                 }
 
@@ -138,10 +163,10 @@
                 t.elapsedMs += dt;
 
                 const remain = Math.max(0, (interval - t.elapsedMs) / 1000);
-                refs.timeLabel.textContent = `${remain.toFixed(remain % 1 === 0 ? 0 : 2)}s`;
+                if (refs.timeLabel) refs.timeLabel.textContent = `${remain.toFixed(remain % 1 === 0 ? 0 : 2)}s`;
 
                 const pct = Math.min(1, t.elapsedMs / interval) * 100;
-                refs.fill.style.width = `${pct}%`;
+                if (refs.fill) refs.fill.style.width = `${pct}%`;
 
                 if (t.elapsedMs >= interval) {
                     t.elapsedMs %= interval;
