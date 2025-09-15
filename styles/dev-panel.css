@@ -1,0 +1,84 @@
+/* Only used when dev/dev-panel.js is included */
+.dev-panel {
+    position: sticky;
+    top: 0;
+    width: 320px;
+    min-width: 320px;
+    max-height: 100dvh;
+    overflow: auto;
+    background: #0e0e0e;
+    border-right: 1px solid #222;
+    padding: 14px;
+}
+
+.dev-title {
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.dev-sec {
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #141414;
+}
+
+.dev-sec h4 {
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    opacity: .9;
+}
+
+.dev-row {
+    display: grid;
+    grid-template-columns: 1fr 130px;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.dev-row label {
+    font-size: 12px;
+    opacity: .9;
+}
+
+.dev-row input[type="number"] {
+    width: 100%;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #2a2a2a;
+    background: #1a1a1a;
+    color: #ddd;
+}
+
+.dev-row input[type="checkbox"] {
+    transform: scale(1.1);
+    justify-self: start;
+}
+
+.dev-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.dev-btn {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    background: #1b1b1b;
+    color: #eee;
+    cursor: pointer;
+}
+
+.dev-btn:active {
+    transform: translateY(1px);
+}
+
+.dev-note {
+    font-size: 12px;
+    opacity: .7;
+    margin-top: 6px;
+}

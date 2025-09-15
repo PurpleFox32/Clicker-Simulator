@@ -1,0 +1,251 @@
+:root {
+    --bg: #121212;
+    --fg: #fff;
+    --panel: #1e1e1e;
+    --accent: #4caf50;
+    --muted: #333;
+    --border: #ffffff88;
+    --disabled: #888;
+    --red: #e74c3c;
+    --green: #2ecc71;
+    --blue: #3498db;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+.main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    gap: 16px;
+}
+
+button {
+    padding: 20px 40px;
+    font-size: 24px;
+    background: var(--panel);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: transform .03s ease;
+}
+
+button:active {
+    transform: translateY(1px) scale(0.99);
+}
+
+button[disabled] {
+    opacity: .6;
+    cursor: not-allowed;
+    border-color: #444;
+    color: var(--disabled);
+}
+
+.progress-container {
+    width: min(900px, 90vw);
+    background: var(--muted);
+    height: 30px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 10px 0;
+    border: 1px solid #000;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width .1s linear;
+}
+
+.stats {
+    font-size: 18px;
+    text-align: center;
+}
+
+.upgrades {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.upgrade-button, #resetButton, #rebirth {
+    padding: 12px 16px;
+    font-size: 16px;
+    border-radius: 8px;
+}
+
+.row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+}
+
+.small {
+    opacity: .85;
+    font-size: 14px;
+}
+
+.sep {
+    opacity: .35;
+    margin: 0 8px;
+}
+
+/* Common panel styles used by both Auto Click and Auto Point */
+.corner-stack {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    display: grid;
+    gap: 10px;
+    z-index: 10;
+}
+
+.corner-panel {
+    width: 300px;
+    background: #0f0f0f;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    display: grid;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.corner-title {
+    font-size: 14px;
+    opacity: .85;
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+.tier {
+    background: #151515;
+    border: 1px solid #232323;
+    border-radius: 10px;
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    position: relative;
+    min-height: 82px;
+    overflow: hidden;
+}
+
+.tier-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.tier-name {
+    font-weight: 600;
+}
+
+.meter {
+    height: 8px;
+    background: #2a2a2a;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #111;
+}
+
+.meter>.fill {
+    height: 100%;
+    width: 0%;
+    transition: width .08s linear;
+}
+
+.fill.red {
+    background: var(--red);
+}
+
+.fill.green {
+    background: var(--green);
+}
+
+.fill.blue {
+    background: var(--blue);
+}
+
+.tiny-btn {
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #3a3a3a;
+    background: #1a1a1a;
+    color: #ddd;
+    cursor: pointer;
+}
+
+.tiny-btn[disabled] {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.locked-view {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(1px);
+}
+
+.locked-view>button, .lock-msg {
+    width: 92%;
+    height: 70%;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid #3a3a3a;
+    background: #161616;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 6px 10px;
+}
+
+.unlocked-view {
+    display: none;
+}
+
+.tier.unlocked .locked-view {
+    display: none;
+}
+
+.tier.unlocked .unlocked-view {
+    display: grid;
+    gap: 6px;
+}
+
+/* Small right-aligned time labels under the bar */
+.time-row {
+    display: flex;
+    justify-content: flex-end;
+    font-size: 11px;
+    opacity: .8;
+    margin-top: -2px;
+}

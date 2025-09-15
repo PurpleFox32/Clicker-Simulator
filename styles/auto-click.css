@@ -1,0 +1,3 @@
+/* Auto Click specific tweaks (colors already defined in main.css) */
+#clickPanel .tier .tier-name { color: #ddd; }
+#clickPanel .corner-title { letter-spacing: .3px; }

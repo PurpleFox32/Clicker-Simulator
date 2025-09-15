@@ -1,0 +1,3 @@
+/* Auto Point specific tweaks */
+#pointPanel .lock-msg { color:#ddd; opacity:.9; }
+#pointPanel .corner-title { letter-spacing: .3px; }
