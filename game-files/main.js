@@ -2,7 +2,7 @@
     const Game = (window.Game = window.Game || {});
 
     // ===== Config / Defaults =====
-    Game.SAVE_KEY = 'clickerSave_v5';
+    Game.SAVE_KEY = 'clickerSave_v6'; // version with tokens + auto-upgrades
     Game.fmt = (n) => {
         if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(2) + 'B';
         if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + 'M';
@@ -47,11 +47,18 @@
         pointFixedIntervalMs: 10000,
         pointPowerStep: 2,
         powerMaxLevelsPoints: 20,
+
+        // Auto-upgrade system
+        autoUpgBaseCosts: [5, 10, 15],           // tokens
+        autoUpgCostMult: 1.5,                    // token cost growth per level
+        autoUpgMaxLevel: 10,
+        autoUpgBaseMinutes: [1, 2, 3],           // tier1,2,3 minutes
+        autoUpgMaxReductionRatio: 0.5,           // up to 50% faster at max
     };
 
     // ===== State =====
     Game.state = {
-        version: 5,
+        version: 6,
         progressMax: Game.BASE.progressMax,
         points: 0,
         clicks: 0,
@@ -61,6 +68,7 @@
         clickUpgradeLevel: 1,
         pointUpgradeLevel: 1,
         rebirths: 0,
+        rebirthTokens: 0, // NEW currency
         pointUpgradeCost: Game.BASE.pointUpgradeCost,
         clickUpgradeCost: Game.BASE.clickUpgradeCost,
         rebirthCost: Game.BASE.rebirthCost,
@@ -82,15 +90,29 @@
 
         pointTiers: Game.BASE.pointTierDefs.map((def) => ({
             color: def.color,
-            devForceUnlocked: false, // dev override
-            unlocked: false, // computed (devForceUnlocked || rebirths >= unlockRebirths)
+            devForceUnlocked: false,
+            unlocked: false,
             basePower: def.basePower,
             powerLevel: 0,
             elapsedMs: 0,
             powerCost: def.baseCost,
             unlockRebirths: def.unlockRebirths,
             baseCost: def.baseCost
-        }))
+        })),
+
+        // Auto-upgrade state (per system & tier)
+        clickAutoUpgrades: [0, 1, 2].map(i => ({
+            owned: false,
+            level: 0,
+            elapsedMs: 0,
+            costTokens: Game.BASE.autoUpgBaseCosts[i],
+        })),
+        pointAutoUpgrades: [0, 1, 2].map(i => ({
+            owned: false,
+            level: 0,
+            elapsedMs: 0,
+            costTokens: Game.BASE.autoUpgBaseCosts[i],
+        })),
     };
 
     // ===== DOM refs (core UI only) =====
@@ -104,6 +126,14 @@
         rebirth: document.getElementById('rebirth'),
         resetButton: document.getElementById('resetButton'),
         metaDisplay: document.getElementById('metaDisplay'),
+
+        // Stats panel elements
+        statPoints: document.getElementById('statPoints'),
+        statClicksRemain: document.getElementById('statClicksRemain'),
+        statRebirths: document.getElementById('statRebirths'),
+        statTokens: document.getElementById('statTokens'),      // NEW
+        statClickPower: document.getElementById('statClickPower'),
+        statPointReward: document.getElementById('statPointReward'),
     };
 
     // ===== Core helpers =====
@@ -160,7 +190,6 @@
         Game.el.upgradeClicks.textContent = `Upgrade Click Power L${Game.state.clickUpgradeLevel} (Cost: ${Game.fmt(Game.state.clickUpgradeCost)})`;
         Game.el.rebirth.textContent = `Rebirth (Cost: ${Game.fmt(Game.state.rebirthCost)})`;
 
-        // Only ask modules to refresh if they are initialized
         if (Game.AutoClick && Game.AutoClick.ready && Game.AutoClick.updateUIAll) Game.AutoClick.updateUIAll();
         if (Game.AutoPoint && Game.AutoPoint.ready && Game.AutoPoint.updateUIAll) Game.AutoPoint.updateUIAll();
     };
@@ -168,17 +197,19 @@
     Game.updateDisplays = () => {
         const clicksRemain = Game.clicksRemainingToFill();
 
+        // core labels (kept for continuity)
         Game.el.scoreDisplay.textContent =
             `Points: ${Game.fmt(Game.state.points)} | Clicks Needed: ${Game.fmt(clicksRemain)} | Clicks Remaining: ${Game.fmt(clicksRemain)}`;
-
         Game.el.totalClicksDisplay.textContent = `Total Clicks: ${Game.fmt(Game.state.clicks)}`;
-
-        Game.el.metaDisplay.innerHTML =
-            `Rebirths: ${Game.state.rebirths}<span class="sep">•</span>` +
-            `Click Power: ${Game.fmt(Game.state.clickPower)}<span class="sep">•</span>` +
-            `Point Reward: ${Game.fmt(Game.state.pointReward)}`;
-
         Game.el.progressBar.style.width = `${(Game.state.progress / Game.state.progressMax) * 100}%`;
+
+        // stats panel
+        if (Game.el.statPoints) Game.el.statPoints.textContent = Game.fmt(Game.state.points);
+        if (Game.el.statClicksRemain) Game.el.statClicksRemain.textContent = Game.fmt(clicksRemain);
+        if (Game.el.statRebirths) Game.el.statRebirths.textContent = Game.fmt(Game.state.rebirths);
+        if (Game.el.statTokens) Game.el.statTokens.textContent = Game.fmt(Game.state.rebirthTokens); // NEW
+        if (Game.el.statClickPower) Game.el.statClickPower.textContent = Game.fmt(Game.state.clickPower);
+        if (Game.el.statPointReward) Game.el.statPointReward.textContent = Game.fmt(Game.state.pointReward);
 
         Game.updateButtons();
         Game.saveGame();
@@ -192,17 +223,40 @@
 
     Game.loadGame = () => {
         try {
-            const raw = localStorage.getItem(Game.SAVE_KEY);
+            // Migrate old keys if present
+            let raw = localStorage.getItem(Game.SAVE_KEY);
+            if (!raw) {
+                // migrate from v5 key if exists
+                raw = localStorage.getItem('clickerSave_v5');
+            }
             if (!raw) return;
             const saved = JSON.parse(raw);
-            if (!saved || saved.version !== 5) return;
+            if (!saved) return;
 
             // Ensure new fields exist for older saves
+            if (typeof saved.version === 'number' && saved.version < 6) {
+                saved.rebirthTokens = saved.rebirthTokens ?? 0;
+                saved.clickAutoUpgrades = saved.clickAutoUpgrades ?? [0, 1, 2].map(i => ({
+                    owned: false, level: 0, elapsedMs: 0, costTokens: Game.BASE.autoUpgBaseCosts[i],
+                }));
+                saved.pointAutoUpgrades = saved.pointAutoUpgrades ?? [0, 1, 2].map(i => ({
+                    owned: false, level: 0, elapsedMs: 0, costTokens: Game.BASE.autoUpgBaseCosts[i],
+                }));
+            }
             if (saved.pointTiers) {
                 saved.pointTiers.forEach(pt => { if (typeof pt.devForceUnlocked === 'undefined') pt.devForceUnlocked = false; });
             }
-            Game.state = { ...Game.state, ...saved };
+            Game.state = { ...Game.state, ...saved, version: 6 };
         } catch { }
+    };
+
+    // ===== Auto-upgrade helpers (shared) =====
+    Game.autoUpgIntervalMs = (tierIndex, level) => {
+        const baseMs = Game.BASE.autoUpgBaseMinutes[tierIndex] * 60_000;
+        const maxReduction = Game.BASE.autoUpgMaxReductionRatio; // 0.5
+        const perLevel = (maxReduction / Game.BASE.autoUpgMaxLevel); // 0.05 each level
+        const reduction = Math.min(maxReduction, perLevel * level);
+        return Math.max(baseMs * (1 - reduction), baseMs * (1 - maxReduction));
     };
 
     // ===== Safer module initialization =====
@@ -212,17 +266,13 @@
                 Game.AutoClick.init();
                 Game.AutoClick.ready = true;
             }
-        } catch (e) {
-            console.error('AutoClick init error:', e);
-        }
+        } catch (e) { console.error('AutoClick init error:', e); }
         try {
             if (Game.AutoPoint && !Game.AutoPoint.ready && typeof Game.AutoPoint.init === 'function') {
                 Game.AutoPoint.init();
                 Game.AutoPoint.ready = true;
             }
-        } catch (e) {
-            console.error('AutoPoint init error:', e);
-        }
+        } catch (e) { console.error('AutoPoint init error:', e); }
     };
 
     // ===== Bind core events =====
@@ -268,7 +318,11 @@
             if (!confirm(`Rebirth for ${Game.fmt(cost)} points? Current x${Game.state.rebirthMultiplier} → x${Game.state.rebirthMultiplier + 1}`)) return;
 
             Game.state.points -= cost;
+
+            // Award tokens: number equal to the NEW rebirth level
             Game.state.rebirths += 1;
+            Game.state.rebirthTokens += Game.state.rebirths;
+
             Game.state.rebirthMultiplier += 1;
 
             Game.state.clicks = 0;
@@ -283,7 +337,7 @@
             Game.state.rebirthCost = Math.ceil(Game.state.rebirthCost * 5);
 
             Game.updateDisplays();
-            alert(`Rebirth complete! Permanent multiplier is now x${Game.state.rebirthMultiplier}.`);
+            alert(`Rebirth complete! Permanent multiplier is now x${Game.state.rebirthMultiplier}. You gained ${Game.state.rebirths} token(s).`);
         });
 
         Game.el.resetButton.addEventListener('click', () => {
@@ -299,7 +353,6 @@
     Game._loopRunning = false;
 
     Game.tick = (dt) => {
-        // Make sure modules are initialized even if they loaded late
         Game.ensureModulesInitialized();
 
         if (Game.AutoClick && Game.AutoClick.ready && Game.AutoClick.tick) Game.AutoClick.tick(dt);
@@ -327,7 +380,6 @@
         Game.bindMainHandlers();
         Game.updateDisplays();
 
-        // Start loop immediately (don’t block on both modules)
         Game.ensureModulesInitialized();
         Game.startLoop();
     });

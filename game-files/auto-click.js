@@ -2,7 +2,10 @@
     const Game = window.Game;
     if (!Game) return;
 
-    const ui = { ctier: [] };
+    const ui = {
+        ctier: [],
+        auto: [], // auto-upgrade UI refs
+    };
 
     function clickIntervalMs(t) {
         const base = Game.BASE.timeStartMs - t.timeLevel * Game.BASE.timeStepMs;
@@ -12,6 +15,49 @@
         return t.basePower + Math.min(Game.BASE.powerMaxExtraClicks, t.powerLevel);
     }
 
+    function mmss(ms) {
+        const s = Math.ceil(ms / 1000);
+        const m = Math.floor(s / 60);
+        const ss = String(s % 60).padStart(2, '0');
+        return `${m}:${ss}`;
+    }
+
+    // ===== AUTO UPGRADE (Click) =====
+    function autoUpgInterval(i) {
+        const au = Game.state.clickAutoUpgrades[i];
+        return Game.autoUpgIntervalMs(i, au.level);
+    }
+
+    function autoUpgApply(i) {
+        // On completion, increase the corresponding CLICK TIER power by +1 (up to max)
+        const tier = Game.state.clickTiers[i];
+        if (!tier.unlocked) return; // do nothing until the tier is unlocked
+        if (tier.powerLevel >= Game.BASE.powerMaxExtraClicks) return;
+        tier.powerLevel += 1;
+    }
+
+    function updateAutoUpgUI(i) {
+        const refs = ui.auto[i];
+        const au = Game.state.clickAutoUpgrades[i];
+
+        const maxed = au.level >= Game.BASE.autoUpgMaxLevel;
+        const btnLabel = au.owned
+            ? (maxed ? `Upgrade (MAX)` : `Upgrade L${au.level} (${Game.fmt(au.costTokens)}T)`)
+            : `Enable (${Game.fmt(au.costTokens)}T)`;
+        refs.btn.textContent = btnLabel;
+        refs.btn.disabled = maxed || Game.state.rebirthTokens < Math.ceil(au.costTokens);
+
+        // time label
+        const interval = autoUpgInterval(i);
+        const remain = Math.max(0, interval - au.elapsedMs);
+        refs.time.textContent = mmss(remain);
+
+        // progress fill
+        const pct = Math.min(1, au.elapsedMs / interval) * 100;
+        refs.fill.style.width = `${pct}%`;
+    }
+
+    // ===== TIER UI =====
     function updateTierUI(i) {
         const t = Game.state.clickTiers[i];
         const refs = ui.ctier[i];
@@ -56,6 +102,7 @@
         ready: false,
 
         init() {
+            // Tier controls
             ui.ctier = [
                 {
                     root: document.getElementById('tier0'),
@@ -86,13 +133,14 @@
                 },
             ];
 
-            // Guard against missing DOM (shouldn’t happen with provided HTML)
-            if (ui.ctier.some(refs => !refs.root)) {
-                console.warn('AutoClick: missing tier DOM elements. Will retry on next tick.');
-                return;
-            }
+            // Auto-upgrade UI for Click
+            ui.auto = [
+                { fill: document.getElementById('cAutoFill0'), time: document.getElementById('cAutoTime0'), btn: document.getElementById('cAutoBtn0') },
+                { fill: document.getElementById('cAutoFill1'), time: document.getElementById('cAutoTime1'), btn: document.getElementById('cAutoBtn1') },
+                { fill: document.getElementById('cAutoFill2'), time: document.getElementById('cAutoTime2'), btn: document.getElementById('cAutoBtn2') },
+            ];
 
-            // Wire buttons
+            // Wire tier buttons
             ui.ctier.forEach((refs, i) => {
                 const t = Game.state.clickTiers[i];
 
@@ -139,15 +187,38 @@
                 }
             });
 
+            // Wire auto-upgrade buttons
+            ui.auto.forEach((refs, i) => {
+                refs.btn.addEventListener('click', () => {
+                    const au = Game.state.clickAutoUpgrades[i];
+                    if (au.level >= Game.BASE.autoUpgMaxLevel) return;
+                    const cost = Math.ceil(au.costTokens);
+                    if (Game.state.rebirthTokens < cost) return;
+                    Game.state.rebirthTokens -= cost;
+
+                    if (!au.owned) {
+                        au.owned = true;
+                    } else {
+                        au.level += 1;
+                    }
+                    au.costTokens = Math.ceil(au.costTokens * Game.BASE.autoUpgCostMult);
+                    Game.updateDisplays();
+                });
+            });
+
             this.ready = true;
             this.updateUIAll();
         },
 
-        updateUIAll() { for (let i = 0; i < Game.state.clickTiers.length; i++) updateTierUI(i); },
+        updateUIAll() {
+            for (let i = 0; i < Game.state.clickTiers.length; i++) updateTierUI(i);
+            for (let i = 0; i < Game.state.clickAutoUpgrades.length; i++) updateAutoUpgUI(i);
+        },
 
         tick(dt) {
             if (!this.ready) return;
 
+            // Tier timers
             for (let i = 0; i < Game.state.clickTiers.length; i++) {
                 const t = Game.state.clickTiers[i];
                 const refs = ui.ctier[i];
@@ -172,6 +243,21 @@
                     t.elapsedMs %= interval;
                     Game.doAutoClicks(clickTierPower(t));
                 }
+            }
+
+            // Auto-upgrade timers
+            for (let i = 0; i < Game.state.clickAutoUpgrades.length; i++) {
+                const au = Game.state.clickAutoUpgrades[i];
+                if (!au.owned) { updateAutoUpgUI(i); continue; }
+                au.elapsedMs += dt;
+
+                const interval = autoUpgInterval(i);
+                if (au.elapsedMs >= interval) {
+                    au.elapsedMs %= interval;
+                    autoUpgApply(i);
+                    Game.updateDisplays();
+                }
+                updateAutoUpgUI(i);
             }
         }
     };

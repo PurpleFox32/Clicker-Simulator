@@ -9,6 +9,10 @@
     --red: #e74c3c;
     --green: #2ecc71;
     --blue: #3498db;
+    --cornerHeight: 340px;
+    /* equal height for all right-side panels */
+    --devWidth: 320px;
+    /* expected dev panel width */
 }
 
 * {
@@ -24,6 +28,23 @@ body {
     background: var(--bg);
     color: var(--fg);
     font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* Keep the main content clear of the fixed right-side panels on wider screens */
+@media (min-width: 900px) {
+    .main {
+        padding-right: calc(320px + 32px);
+    }
+
+    /* right stack width + breathing room */
+}
+
+/* When the dev panel is present (body.dev-open), give the main area left padding on larger screens.
+   This prevents overlap while keeping the center alignment vibe. */
+@media (min-width: 1200px) {
+    body.dev-open .main {
+        padding-left: calc(var(--devWidth) + 32px);
+    }
 }
 
 .main {
@@ -111,7 +132,7 @@ button[disabled] {
     margin: 0 8px;
 }
 
-/* Common panel styles used by both Auto Click and Auto Point */
+/* Right-side panel stack */
 .corner-stack {
     position: fixed;
     right: 16px;
@@ -122,7 +143,7 @@ button[disabled] {
 }
 
 .corner-panel {
-    width: 300px;
+    width: 320px;
     background: #0f0f0f;
     border: 1px solid #222;
     border-radius: 12px;
@@ -131,6 +152,9 @@ button[disabled] {
     display: grid;
     gap: 8px;
     font-size: 13px;
+    height: var(--cornerHeight);
+    overflow-y: auto;
+    /* scrollable */
 }
 
 .corner-title {
@@ -140,6 +164,7 @@ button[disabled] {
     margin-bottom: 2px;
 }
 
+/* Shared tier card styles */
 .tier {
     background: #151515;
     border: 1px solid #232323;
@@ -248,4 +273,87 @@ button[disabled] {
     font-size: 11px;
     opacity: .8;
     margin-top: -2px;
+}
+
+/* ===== Stats panel content ===== */
+.stat-grid {
+    display: grid;
+    gap: 6px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 6px;
+    background: #131313;
+    border: 1px solid #1f1f1f;
+    border-radius: 8px;
+}
+
+/* ===== Auto-upgrade strips (both systems) ===== */
+.auto-upgrade {
+    margin-top: 2px;
+}
+
+.auto-upgrade-strip {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    align-items: start;
+}
+
+.auto-upg {
+    display: grid;
+    gap: 6px;
+    justify-items: stretch;
+    align-items: center;
+}
+
+.mini-meter {
+    height: 6px;
+    background: #2a2a2a;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #111;
+}
+
+.mini-fill {
+    height: 100%;
+    width: 0%;
+    transition: width .1s linear;
+}
+
+.mini-fill.red {
+    background: var(--red);
+}
+
+.mini-fill.green {
+    background: var(--green);
+}
+
+.mini-fill.blue {
+    background: var(--blue);
+}
+
+.mini-time {
+    font-size: 11px;
+    opacity: .85;
+    text-align: right;
+}
+
+.mini-btn {
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #3a3a3a;
+    background: #1a1a1a;
+    color: #ddd;
+    cursor: pointer;
+}
+
+.mini-btn[disabled] {
+    opacity: .55;
+    cursor: not-allowed;
 }

@@ -30,12 +30,7 @@
             Points: 0 | Clicks Needed: 10 | Clicks Remaining: 10
         </div>
 
-        <div class="row small" id="metaDisplay">
-            Rebirths: 0<span class="sep">•</span>
-            Click Power: 1<span class="sep">•</span>
-            Point Reward: 1
-        </div>
-
+        <div class="row small" id="metaDisplay" style="display:none"></div>
         <div class="upgrades">
             <button class="upgrade-button" id="upgradePoints" title="Increase points gained per fill">Upgrade Points L1
                 (Cost: 10)</button>
@@ -46,11 +41,51 @@
         </div>
     </main>
 
-    <!-- Bottom-right: Click panel on top, Points panel under it -->
+    <!-- Right-side stack: Stats, Auto Click, Auto Point -->
     <div class="corner-stack">
+        <!-- Stats Panel (label restored) -->
+        <div class="corner-panel" id="statsPanel">
+            <div class="corner-title">Game Stats</div>
+            <div class="stat-grid">
+                <div class="stat-row"><span>Points</span><span id="statPoints">0</span></div>
+                <div class="stat-row"><span>Clicks Remaining</span><span id="statClicksRemain">10</span></div>
+                <div class="stat-row"><span>Rebirths</span><span id="statRebirths">0</span></div>
+                <div class="stat-row"><span>Rebirth Tokens</span><span id="statTokens">0</span></div>
+                <div class="stat-row"><span>Click Power</span><span id="statClickPower">1</span></div>
+                <div class="stat-row"><span>Point Reward</span><span id="statPointReward">1</span></div>
+            </div>
+        </div>
+
         <!-- Auto Clicks -->
         <div class="corner-panel" id="clickPanel">
             <div class="corner-title">Auto Click Tiers</div>
+
+            <!-- Auto-upgrade strip (Click) -->
+            <div class="auto-upgrade">
+                <div class="auto-upgrade-strip" id="clickAutoStrip">
+                    <div class="auto-upg">
+                        <div class="mini-meter">
+                            <div class="mini-fill red" id="cAutoFill0"></div>
+                        </div>
+                        <div class="mini-time" id="cAutoTime0">1:00</div>
+                        <button class="mini-btn" id="cAutoBtn0">Enable (5T)</button>
+                    </div>
+                    <div class="auto-upg">
+                        <div class="mini-meter">
+                            <div class="mini-fill green" id="cAutoFill1"></div>
+                        </div>
+                        <div class="mini-time" id="cAutoTime1">2:00</div>
+                        <button class="mini-btn" id="cAutoBtn1">Enable (10T)</button>
+                    </div>
+                    <div class="auto-upg">
+                        <div class="mini-meter">
+                            <div class="mini-fill blue" id="cAutoFill2"></div>
+                        </div>
+                        <div class="mini-time" id="cAutoTime2">3:00</div>
+                        <button class="mini-btn" id="cAutoBtn2">Enable (15T)</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Tier 1 -->
             <div class="tier" data-tier="0" id="tier0">
@@ -113,6 +148,33 @@
         <!-- Auto Points -->
         <div class="corner-panel" id="pointPanel">
             <div class="corner-title">Auto Point Tiers</div>
+
+            <!-- Auto-upgrade strip (Point) -->
+            <div class="auto-upgrade">
+                <div class="auto-upgrade-strip" id="pointAutoStrip">
+                    <div class="auto-upg">
+                        <div class="mini-meter">
+                            <div class="mini-fill red" id="pAutoFill0"></div>
+                        </div>
+                        <div class="mini-time" id="pAutoTime0">1:00</div>
+                        <button class="mini-btn" id="pAutoBtn0">Enable (5T)</button>
+                    </div>
+                    <div class="auto-upg">
+                        <div class="mini-meter">
+                            <div class="mini-fill green" id="pAutoFill1"></div>
+                        </div>
+                        <div class="mini-time" id="pAutoTime1">2:00</div>
+                        <button class="mini-btn" id="pAutoBtn1">Enable (10T)</button>
+                    </div>
+                    <div class="auto-upg">
+                        <div class="mini-meter">
+                            <div class="mini-fill blue" id="pAutoFill2"></div>
+                        </div>
+                        <div class="mini-time" id="pAutoTime2">3:00</div>
+                        <button class="mini-btn" id="pAutoBtn2">Enable (15T)</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- P Tier 1 -->
             <div class="tier" data-ptier="0" id="ptier0">

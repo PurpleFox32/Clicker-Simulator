@@ -2,13 +2,56 @@
     const Game = window.Game;
     if (!Game) return;
 
-    const ui = { ptier: [] };
+    const ui = {
+        ptier: [],
+        auto: [], // auto-upgrade UI refs
+    };
 
     const pointIntervalMs = () => Game.BASE.pointFixedIntervalMs;
     const pointTierPower = (t) => t.basePower + (t.powerLevel * Game.BASE.pointPowerStep);
     const isUnlocked = (t) => !!t.devForceUnlocked || Game.state.rebirths >= t.unlockRebirths;
 
-    function updateTierUI(i) {
+    function mmss(ms) {
+        const s = Math.ceil(ms / 1000);
+        const m = Math.floor(s / 60);
+        const ss = String(s % 60).padStart(2, '0');
+        return `${m}:${ss}`;
+    }
+
+    // ===== AUTO UPGRADE (Point) =====
+    function autoUpgInterval(i) {
+        const au = Game.state.pointAutoUpgrades[i];
+        return Game.autoUpgIntervalMs(i, au.level);
+    }
+
+    function autoUpgApply(i) {
+        // On completion, increase the corresponding POINT TIER power by +1 (up to max)
+        const tier = Game.state.pointTiers[i];
+        if (!isUnlocked(tier)) return; // wait until tier unlocks
+        if (tier.powerLevel >= Game.BASE.powerMaxLevelsPoints) return;
+        tier.powerLevel += 1;
+    }
+
+    function updateAutoUpgUI(i) {
+        const refs = ui.auto[i];
+        const au = Game.state.pointAutoUpgrades[i];
+
+        const maxed = au.level >= Game.BASE.autoUpgMaxLevel;
+        const btnLabel = au.owned
+            ? (maxed ? `Upgrade (MAX)` : `Upgrade L${au.level} (${Game.fmt(au.costTokens)}T)`)
+            : `Enable (${Game.fmt(au.costTokens)}T)`;
+        refs.btn.textContent = btnLabel;
+        refs.btn.disabled = maxed || Game.state.rebirthTokens < Math.ceil(au.costTokens);
+
+        const interval = autoUpgInterval(i);
+        const remain = Math.max(0, interval - au.elapsedMs);
+        refs.time.textContent = mmss(remain);
+
+        const pct = Math.min(1, au.elapsedMs / interval) * 100;
+        refs.fill.style.width = `${pct}%`;
+    }
+
+    function updatePointTierUI(i) {
         const t = Game.state.pointTiers[i];
         const refs = ui.ptier[i];
         if (!refs) return;
@@ -67,11 +110,12 @@
                 },
             ];
 
-            // Guard against missing DOM (shouldn’t happen with provided HTML)
-            if (ui.ptier.some(refs => !refs.root)) {
-                console.warn('AutoPoint: missing tier DOM elements. Will retry on next tick.');
-                return;
-            }
+            // Auto-upgrade UI for Point
+            ui.auto = [
+                { fill: document.getElementById('pAutoFill0'), time: document.getElementById('pAutoTime0'), btn: document.getElementById('pAutoBtn0') },
+                { fill: document.getElementById('pAutoFill1'), time: document.getElementById('pAutoTime1'), btn: document.getElementById('pAutoBtn1') },
+                { fill: document.getElementById('pAutoFill2'), time: document.getElementById('pAutoTime2'), btn: document.getElementById('pAutoBtn2') },
+            ];
 
             // Wire power buttons
             ui.ptier.forEach((refs, i) => {
@@ -89,19 +133,41 @@
                 });
             });
 
+            // Wire auto-upgrade buttons
+            ui.auto.forEach((refs, i) => {
+                refs.btn.addEventListener('click', () => {
+                    const au = Game.state.pointAutoUpgrades[i];
+                    if (au.level >= Game.BASE.autoUpgMaxLevel) return;
+                    const cost = Math.ceil(au.costTokens);
+                    if (Game.state.rebirthTokens < cost) return;
+                    Game.state.rebirthTokens -= cost;
+
+                    if (!au.owned) {
+                        au.owned = true;
+                    } else {
+                        au.level += 1;
+                    }
+                    au.costTokens = Math.ceil(au.costTokens * Game.BASE.autoUpgCostMult);
+                    Game.updateDisplays();
+                });
+            });
+
             this.ready = true;
             this.updateUIAll();
         },
 
-        updateUIAll() { for (let i = 0; i < Game.state.pointTiers.length; i++) updateTierUI(i); },
+        updateUIAll() {
+            for (let i = 0; i < Game.state.pointTiers.length; i++) updatePointTierUI(i);
+            for (let i = 0; i < Game.state.pointAutoUpgrades.length; i++) updateAutoUpgUI(i);
+        },
 
         tick(dt) {
             if (!this.ready) return;
 
+            // Tier timers
             for (let i = 0; i < Game.state.pointTiers.length; i++) {
                 const t = Game.state.pointTiers[i];
                 const refs = ui.ptier[i];
-                if (!refs) continue;
 
                 const wasUnlocked = t.unlocked;
                 t.unlocked = isUnlocked(t);
@@ -129,6 +195,21 @@
                     t.elapsedMs %= interval;
                     Game.addPointsDirect(pointTierPower(t));
                 }
+            }
+
+            // Auto-upgrade timers
+            for (let i = 0; i < Game.state.pointAutoUpgrades.length; i++) {
+                const au = Game.state.pointAutoUpgrades[i];
+                if (!au.owned) { updateAutoUpgUI(i); continue; }
+
+                au.elapsedMs += dt;
+                const interval = autoUpgInterval(i);
+                if (au.elapsedMs >= interval) {
+                    au.elapsedMs %= interval;
+                    autoUpgApply(i);
+                    Game.updateDisplays();
+                }
+                updateAutoUpgUI(i);
             }
         }
     };
