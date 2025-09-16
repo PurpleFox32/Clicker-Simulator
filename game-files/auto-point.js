@@ -2,217 +2,173 @@
     const Game = window.Game;
     if (!Game) return;
 
-    const ui = {
-        ptier: [],
-        auto: [], // auto-upgrade UI refs
+    const AutoPoint = (Game.AutoPoint = Game.AutoPoint || {});
+    AutoPoint.ready = false;
+
+    // ----- DOM references -----
+    const pEls = [0, 1, 2].map(i => ({
+        root: document.getElementById(`ptier${i}`),
+        powerBtn: document.getElementById(`p${i}Power`),
+        fill: document.getElementById(`p${i}Fill`),
+        timeLabel: document.getElementById(`p${i}TimeLabel`),
+        stats: document.getElementById(`p${i}Stats`),
+        lockMsg: document.getElementById(`p${i}LockMsg`),
+    }));
+
+    const auEls = [0, 1, 2].map(i => ({
+        fill: document.getElementById(`pAutoFill${i}`),
+        time: document.getElementById(`pAutoTime${i}`),
+        btn: document.getElementById(`pAutoBtn${i}`),
+    }));
+
+    // ----- Helpers -----
+    const generatorUnlocked = (i) => {
+        const pt = Game.state.pointTiers[i];
+        const unlockedByRebirth = Game.state.rebirths >= pt.unlockRebirths;
+        pt.unlocked = unlockedByRebirth || !!pt.devForceUnlocked;
+        return pt.unlocked;
     };
 
     const pointIntervalMs = () => Game.BASE.pointFixedIntervalMs;
-    const pointTierPower = (t) => t.basePower + (t.powerLevel * Game.BASE.pointPowerStep);
-    const isUnlocked = (t) => !!t.devForceUnlocked || Game.state.rebirths >= t.unlockRebirths;
+    const pointPower = (pt) => pt.basePower + (pt.powerLevel * Game.BASE.pointPowerStep);
 
-    function mmss(ms) {
-        const s = Math.ceil(ms / 1000);
+    const formatMMSS = (ms) => {
+        const s = Math.max(0, Math.ceil(ms / 1000));
         const m = Math.floor(s / 60);
         const ss = String(s % 60).padStart(2, '0');
         return `${m}:${ss}`;
-    }
-
-    // ===== AUTO UPGRADE (Point) =====
-    function autoUpgInterval(i) {
-        const au = Game.state.pointAutoUpgrades[i];
-        return Game.autoUpgIntervalMs(i, au.level);
-    }
-
-    function autoUpgApply(i) {
-        // On completion, increase the corresponding POINT TIER power by +1 (up to max)
-        const tier = Game.state.pointTiers[i];
-        if (!isUnlocked(tier)) return; // wait until tier unlocks
-        if (tier.powerLevel >= Game.BASE.powerMaxLevelsPoints) return;
-        tier.powerLevel += 1;
-    }
-
-    function updateAutoUpgUI(i) {
-        const refs = ui.auto[i];
-        const au = Game.state.pointAutoUpgrades[i];
-
-        const maxed = au.level >= Game.BASE.autoUpgMaxLevel;
-        const btnLabel = au.owned
-            ? (maxed ? `Upgrade (MAX)` : `Upgrade L${au.level} (${Game.fmt(au.costTokens)}T)`)
-            : `Enable (${Game.fmt(au.costTokens)}T)`;
-        refs.btn.textContent = btnLabel;
-        refs.btn.disabled = maxed || Game.state.rebirthTokens < Math.ceil(au.costTokens);
-
-        const interval = autoUpgInterval(i);
-        const remain = Math.max(0, interval - au.elapsedMs);
-        refs.time.textContent = mmss(remain);
-
-        const pct = Math.min(1, au.elapsedMs / interval) * 100;
-        refs.fill.style.width = `${pct}%`;
-    }
-
-    function updatePointTierUI(i) {
-        const t = Game.state.pointTiers[i];
-        const refs = ui.ptier[i];
-        if (!refs) return;
-
-        t.unlocked = isUnlocked(t);
-        refs.root.classList.toggle('unlocked', t.unlocked);
-
-        if (!t.unlocked) {
-            refs.lockMsg.textContent = `Requires ${t.unlockRebirths} rebirth${t.unlockRebirths === 1 ? '' : 's'} (or enable in Dev)`;
-            refs.fill.style.width = '0%';
-            refs.timeLabel.textContent = `${(pointIntervalMs() / 1000).toFixed(2)}s`;
-            return;
-        }
-
-        const secs = (pointIntervalMs() / 1000);
-        refs.stats.textContent = `+${pointTierPower(t)} / ${secs.toFixed(0)}s`;
-
-        const remain = Math.max(0, (pointIntervalMs() - t.elapsedMs) / 1000);
-        refs.timeLabel.textContent = `${remain.toFixed(remain % 1 === 0 ? 0 : 2)}s`;
-
-        const powerMaxed = t.powerLevel >= Game.BASE.powerMaxLevelsPoints;
-        refs.btnPower.textContent = powerMaxed
-            ? `Power L${t.powerLevel} (MAX)`
-            : `Power L${t.powerLevel} (${Game.fmt(Math.ceil(t.powerCost))})`;
-        refs.btnPower.disabled = powerMaxed || Game.state.points < Math.ceil(t.powerCost);
-    }
-
-    const AutoPoint = {
-        ready: false,
-
-        init() {
-            ui.ptier = [
-                {
-                    root: document.getElementById('ptier0'),
-                    stats: document.getElementById('p0Stats'),
-                    fill: document.getElementById('p0Fill'),
-                    timeLabel: document.getElementById('p0TimeLabel'),
-                    btnPower: document.getElementById('p0Power'),
-                    lockMsg: document.getElementById('p0LockMsg'),
-                },
-                {
-                    root: document.getElementById('ptier1'),
-                    stats: document.getElementById('p1Stats'),
-                    fill: document.getElementById('p1Fill'),
-                    timeLabel: document.getElementById('p1TimeLabel'),
-                    btnPower: document.getElementById('p1Power'),
-                    lockMsg: document.getElementById('p1LockMsg'),
-                },
-                {
-                    root: document.getElementById('ptier2'),
-                    stats: document.getElementById('p2Stats'),
-                    fill: document.getElementById('p2Fill'),
-                    timeLabel: document.getElementById('p2TimeLabel'),
-                    btnPower: document.getElementById('p2Power'),
-                    lockMsg: document.getElementById('p2LockMsg'),
-                },
-            ];
-
-            // Auto-upgrade UI for Point
-            ui.auto = [
-                { fill: document.getElementById('pAutoFill0'), time: document.getElementById('pAutoTime0'), btn: document.getElementById('pAutoBtn0') },
-                { fill: document.getElementById('pAutoFill1'), time: document.getElementById('pAutoTime1'), btn: document.getElementById('pAutoBtn1') },
-                { fill: document.getElementById('pAutoFill2'), time: document.getElementById('pAutoTime2'), btn: document.getElementById('pAutoBtn2') },
-            ];
-
-            // Wire power buttons
-            ui.ptier.forEach((refs, i) => {
-                refs.btnPower.addEventListener('click', () => {
-                    const t = Game.state.pointTiers[i];
-                    if (!isUnlocked(t)) return;
-                    const maxed = t.powerLevel >= Game.BASE.powerMaxLevelsPoints;
-                    const cost = Math.ceil(t.powerCost);
-                    if (!maxed && Game.state.points >= cost) {
-                        Game.state.points -= cost;
-                        t.powerLevel++;
-                        t.powerCost = Math.ceil(t.powerCost * Game.BASE.tierUpgradeCostMult);
-                        Game.updateDisplays();
-                    }
-                });
-            });
-
-            // Wire auto-upgrade buttons
-            ui.auto.forEach((refs, i) => {
-                refs.btn.addEventListener('click', () => {
-                    const au = Game.state.pointAutoUpgrades[i];
-                    if (au.level >= Game.BASE.autoUpgMaxLevel) return;
-                    const cost = Math.ceil(au.costTokens);
-                    if (Game.state.rebirthTokens < cost) return;
-                    Game.state.rebirthTokens -= cost;
-
-                    if (!au.owned) {
-                        au.owned = true;
-                    } else {
-                        au.level += 1;
-                    }
-                    au.costTokens = Math.ceil(au.costTokens * Game.BASE.autoUpgCostMult);
-                    Game.updateDisplays();
-                });
-            });
-
-            this.ready = true;
-            this.updateUIAll();
-        },
-
-        updateUIAll() {
-            for (let i = 0; i < Game.state.pointTiers.length; i++) updatePointTierUI(i);
-            for (let i = 0; i < Game.state.pointAutoUpgrades.length; i++) updateAutoUpgUI(i);
-        },
-
-        tick(dt) {
-            if (!this.ready) return;
-
-            // Tier timers
-            for (let i = 0; i < Game.state.pointTiers.length; i++) {
-                const t = Game.state.pointTiers[i];
-                const refs = ui.ptier[i];
-
-                const wasUnlocked = t.unlocked;
-                t.unlocked = isUnlocked(t);
-                refs.root.classList.toggle('unlocked', t.unlocked);
-
-                if (!t.unlocked) {
-                    refs.fill.style.width = '0%';
-                    refs.lockMsg.textContent = `Requires ${t.unlockRebirths} rebirth${t.unlockRebirths === 1 ? '' : 's'} (or enable in Dev)`;
-                    refs.timeLabel.textContent = `${(pointIntervalMs() / 1000).toFixed(2)}s`;
-                    continue;
-                } else if (!wasUnlocked) {
-                    t.elapsedMs = 0; // start fresh on unlock
-                }
-
-                const interval = pointIntervalMs();
-                t.elapsedMs += dt;
-
-                const remain = Math.max(0, (interval - t.elapsedMs) / 1000);
-                refs.timeLabel.textContent = `${remain.toFixed(remain % 1 === 0 ? 0 : 2)}s`;
-
-                const pct = Math.min(1, t.elapsedMs / interval) * 100;
-                refs.fill.style.width = `${pct}%`;
-
-                if (t.elapsedMs >= interval) {
-                    t.elapsedMs %= interval;
-                    Game.addPointsDirect(pointTierPower(t));
-                }
-            }
-
-            // Auto-upgrade timers
-            for (let i = 0; i < Game.state.pointAutoUpgrades.length; i++) {
-                const au = Game.state.pointAutoUpgrades[i];
-                if (!au.owned) { updateAutoUpgUI(i); continue; }
-
-                au.elapsedMs += dt;
-                const interval = autoUpgInterval(i);
-                if (au.elapsedMs >= interval) {
-                    au.elapsedMs %= interval;
-                    autoUpgApply(i);
-                    Game.updateDisplays();
-                }
-                updateAutoUpgUI(i);
-            }
-        }
     };
 
-    Game.AutoPoint = AutoPoint;
+    // ----- UI update -----
+    AutoPoint.updateUIAll = () => {
+        Game.state.pointTiers.forEach((pt, i) => {
+            const el = pEls[i]; if (!el.root) return;
+            const isUnlocked = generatorUnlocked(i);
+
+            // Lock overlay message
+            if (el.lockMsg) {
+                el.lockMsg.textContent = pt.devForceUnlocked
+                    ? 'Dev-unlocked'
+                    : `Requires ${pt.unlockRebirths} rebirth${pt.unlockRebirths > 1 ? 's' : ''}`;
+            }
+
+            if (isUnlocked) el.root.classList.add('unlocked');
+            else el.root.classList.remove('unlocked');
+
+            // Power upgrade (points currency)
+            if (el.powerBtn) {
+                const can = Game.state.points >= Math.ceil(pt.powerCost) && pt.powerLevel < Game.BASE.powerMaxLevelsPoints;
+                el.powerBtn.disabled = !can || !isUnlocked;
+                el.powerBtn.textContent = `Power L${pt.powerLevel} (${Game.fmt(pt.powerCost)})`;
+            }
+
+            // Stats
+            if (el.stats) el.stats.textContent = `+${pointPower(pt)} / 10s`;
+
+            // Progress
+            const iv = pointIntervalMs();
+            const pct = isUnlocked ? Math.min(100, (pt.elapsedMs / iv) * 100) : 0;
+            if (el.fill) el.fill.style.width = `${pct}%`;
+            if (el.timeLabel) el.timeLabel.textContent = (isUnlocked ? (iv - pt.elapsedMs) : iv) / 1000
+                .toFixed(2) + 's';
+        });
+
+        // Auto-Upgrades strip — GATE purchase behind generator unlock; behavior otherwise unchanged
+        Game.state.pointAutoUpgrades.forEach((au, i) => {
+            const e = auEls[i]; if (!e) return;
+            const tierOwned = generatorUnlocked(i);
+
+            if (!au.owned) {
+                e.btn.disabled = !tierOwned || Game.state.rebirthTokens < au.costTokens;
+                e.btn.textContent = tierOwned ? `Enable (${Game.fmt(au.costTokens)}T)` : `Requires Tier ${i + 1}`;
+                e.time.textContent = formatMMSS(Game.autoUpgIntervalMs(i, 0));
+                if (e.fill) e.fill.style.width = '0%';
+            } else {
+                e.btn.disabled = Game.state.rebirthTokens < au.costTokens;
+                e.btn.textContent = `Upgrade L${au.level} (${Game.fmt(au.costTokens)}T)`;
+                const iv = Game.autoUpgIntervalMs(i, au.level);
+                e.time.textContent = formatMMSS(Math.max(0, iv - au.elapsedMs));
+                const pct = Math.min(100, (au.elapsedMs / iv) * 100);
+                if (e.fill) e.fill.style.width = `${pct}%`;
+            }
+        });
+    };
+
+    // ----- Wiring -----
+    AutoPoint.init = () => {
+        // Power upgrade buys
+        pEls.forEach((el, i) => {
+            el.powerBtn?.addEventListener('click', () => {
+                const pt = Game.state.pointTiers[i];
+                if (!generatorUnlocked(i)) return;
+                if (pt.powerLevel >= Game.BASE.powerMaxLevelsPoints) return;
+                const cost = Math.ceil(pt.powerCost);
+                if (Game.state.points < cost) return;
+                Game.state.points -= cost;
+                pt.powerLevel += 1;
+                pt.powerCost = Math.ceil(pt.powerCost * Game.BASE.tierUpgradeCostMult);
+                Game.updateDisplays();
+            });
+        });
+
+        // Auto-Upgrade purchase/level (GATED by generator ownership)
+        auEls.forEach((e, i) => {
+            e.btn?.addEventListener('click', () => {
+                const au = Game.state.pointAutoUpgrades[i];
+                if (!generatorUnlocked(i)) return; // cannot buy/level without generator unlocked
+                const cost = Math.ceil(au.costTokens);
+                if (Game.state.rebirthTokens < cost) return;
+
+                Game.state.rebirthTokens -= cost;
+                if (!au.owned) {
+                    au.owned = true;
+                } else {
+                    if (au.level >= Game.BASE.autoUpgMaxLevel) return;
+                    au.level += 1;
+                }
+                au.costTokens = Math.ceil(au.costTokens * Game.BASE.autoUpgCostMult);
+                Game.updateDisplays();
+            });
+        });
+
+        AutoPoint.ready = true;
+        AutoPoint.updateUIAll();
+    };
+
+    // Auto-upgrades: when a cycle completes and tier is unlocked, increase Power if possible
+    function applyPointAutoUpgrade(idx) {
+        const pt = Game.state.pointTiers[idx];
+        if (!generatorUnlocked(idx)) return; // (rebirths only increase; this will almost always be true once met)
+        if (pt.powerLevel < Game.BASE.powerMaxLevelsPoints) {
+            pt.powerLevel += 1;
+        }
+    }
+
+    // ----- Tick -----
+    AutoPoint.tick = (dt) => {
+        // Generators: points every fixed interval
+        Game.state.pointTiers.forEach((pt, i) => {
+            if (!generatorUnlocked(i)) return;
+            pt.elapsedMs += dt;
+            const iv = pointIntervalMs();
+            while (pt.elapsedMs >= iv) {
+                pt.elapsedMs -= iv;
+                Game.addPointsDirect(pointPower(pt));
+            }
+        });
+
+        // Auto-Upgrades (no rebirth changes requested; just run if owned)
+        Game.state.pointAutoUpgrades.forEach((au, i) => {
+            if (!au.owned) return;
+            if (!generatorUnlocked(i)) return; // cannot progress if tier not unlocked yet
+            au.elapsedMs += dt;
+            const iv = Game.autoUpgIntervalMs(i, au.level);
+            while (au.elapsedMs >= iv) {
+                au.elapsedMs -= iv;
+                applyPointAutoUpgrade(i);
+            }
+        });
+
+        AutoPoint.updateUIAll();
+    };
 })();
