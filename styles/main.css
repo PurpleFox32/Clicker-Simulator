@@ -9,54 +9,96 @@
     --red: #e74c3c;
     --green: #2ecc71;
     --blue: #3498db;
+
+    /* Equal heights for the three right-side panels */
     --cornerHeight: 340px;
-    /* equal height for all right-side panels */
+    /* Dev panel width hint (used in dev-panel.css too) */
     --devWidth: 320px;
-    /* expected dev panel width */
 }
 
 * {
     box-sizing: border-box;
 }
 
+/* ===== Page layout (flexbox) ===== */
 body {
+    /* Three-columns when dev panel is present: [dev-panel] [main] [right-stack] */
     display: flex;
-    align-items: stretch;
+    gap: 16px;
+    align-items: flex-start;
     justify-content: center;
     min-height: 100vh;
     margin: 0;
     background: var(--bg);
     color: var(--fg);
     font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif;
+    padding: 16px;
+    /* also provides breathing room for sticky elements */
 }
 
-/* Keep the main content clear of the fixed right-side panels on wider screens */
-@media (min-width: 900px) {
-    .main {
-        padding-right: calc(320px + 32px);
-    }
-
-    /* right stack width + breathing room */
-}
-
-/* When the dev panel is present (body.dev-open), give the main area left padding on larger screens.
-   This prevents overlap while keeping the center alignment vibe. */
-@media (min-width: 1200px) {
-    body.dev-open .main {
-        padding-left: calc(var(--devWidth) + 32px);
-    }
-}
-
+/* Main game area sits in the middle, grows when dev panel isn't present */
 .main {
-    flex: 1;
+    flex: 1 1 720px;
+    /* preferred width but flexible */
+    min-width: 520px;
+    /* don't let it get too tiny */
+    max-width: 980px;
+    /* keep a pleasant line-length */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    /* center contents vertically when we have height */
     gap: 16px;
 }
 
+/* NEW: On wider screens, let .main take the viewport height so its contents
+   can be vertically centered. We subtract the body’s vertical padding (16+16). */
+@media (min-width: 1100px) {
+    .main {
+        min-height: calc(100vh - 32px);
+        align-self: stretch;
+        /* make the flex item span the container’s height */
+    }
+}
+
+/* Right-side stack becomes a normal column with sticky positioning and its own scroll */
+.corner-stack {
+    width: 320px;
+    display: grid;
+    gap: 10px;
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    /* viewport minus body padding */
+    overflow-y: auto;
+    /* scroll the entire stack if it exceeds viewport */
+    /* No fixed positioning — prevents overlap with the main area */
+}
+
+.corner-panel {
+    background: #0f0f0f;
+    border: 1px solid #222;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    display: grid;
+    gap: 8px;
+    font-size: 13px;
+    height: var(--cornerHeight);
+    /* equal height for all three */
+    overflow-y: auto;
+    /* inner scroll if content exceeds the panel */
+}
+
+.corner-title {
+    font-size: 14px;
+    opacity: .85;
+    text-align: center;
+    margin-bottom: 2px;
+}
+
+/* ===== Buttons & bars ===== */
 button {
     padding: 20px 40px;
     font-size: 24px;
@@ -132,39 +174,7 @@ button[disabled] {
     margin: 0 8px;
 }
 
-/* Right-side panel stack */
-.corner-stack {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    display: grid;
-    gap: 10px;
-    z-index: 10;
-}
-
-.corner-panel {
-    width: 320px;
-    background: #0f0f0f;
-    border: 1px solid #222;
-    border-radius: 12px;
-    padding: 10px;
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
-    display: grid;
-    gap: 8px;
-    font-size: 13px;
-    height: var(--cornerHeight);
-    overflow-y: auto;
-    /* scrollable */
-}
-
-.corner-title {
-    font-size: 14px;
-    opacity: .85;
-    text-align: center;
-    margin-bottom: 2px;
-}
-
-/* Shared tier card styles */
+/* ===== Tier cards ===== */
 .tier {
     background: #151515;
     border: 1px solid #232323;
@@ -356,4 +366,23 @@ button[disabled] {
 .mini-btn[disabled] {
     opacity: .55;
     cursor: not-allowed;
+}
+
+/* ===== Responsive niceties ===== */
+@media (max-width: 1100px) {
+    body {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .corner-stack {
+        position: static;
+        width: min(640px, 92vw);
+        max-height: none;
+    }
+
+    .main {
+        min-width: 0;
+        width: min(900px, 95vw);
+    }
 }
